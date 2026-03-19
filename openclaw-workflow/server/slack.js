@@ -1,8 +1,16 @@
-const { App, ExpressReceiver } = require("@slack/bolt");
+const { App, ExpressReceiver, LogLevel } = require("@slack/bolt");
+const { WebClient } = require("@slack/web-api");
 const { runAgent } = require("./agents");
+
+const AGENT_TOKENS = {
+  manager: () => process.env.SLACK_TOKEN_ALEX,
+  pm:      () => process.env.SLACK_TOKEN_EMMA,
+  dev:     () => process.env.SLACK_TOKEN_JAMES,
+};
 
 let receiver;
 let app;
+let agentClients = {};
 
 function createSlackApp(expressApp) {
   receiver = new ExpressReceiver({
@@ -11,27 +19,36 @@ function createSlackApp(expressApp) {
     app: expressApp,
   });
 
+  // Alex is the main bot that receives events
   app = new App({
-    token: process.env.OPENCLAW_SLACK_TOKEN,
+    token: process.env.SLACK_TOKEN_ALEX,
     receiver,
   });
+
+  // Create separate WebClients for Emma and James
+  agentClients = {
+    manager: new WebClient(process.env.SLACK_TOKEN_ALEX),
+    pm:      new WebClient(process.env.SLACK_TOKEN_EMMA),
+    dev:     new WebClient(process.env.SLACK_TOKEN_JAMES),
+  };
 
   const DEFAULT_CHANNEL = process.env.SLACK_DEFAULT_CHANNEL || "C0AMF4G23PF";
 
   // Handle @mentions
-  app.event("app_mention", async ({ event, say }) => {
+  app.event("app_mention", async ({ event }) => {
     console.log(`[slack] app_mention from ${event.user}: ${event.text}`);
     try {
-      const result = await runAgent("manager", event.text);
-      await say({ text: result.reply || "처리 완료" });
+      await runAgent("manager", event.text, {
+        onMessage: (agentKey, text) => postAsAgent(event.channel, agentKey, text),
+      });
     } catch (err) {
       console.error("[slack] agent error:", err);
-      await say({ text: `오류가 발생했습니다: ${err.message}` });
+      await postAsAgent(event.channel, "manager", `오류가 발생했습니다: ${err.message}`);
     }
   });
 
   // Handle DMs
-  app.event("message", async ({ event, say }) => {
+  app.event("message", async ({ event }) => {
     // Skip bot messages and threaded replies to avoid loops
     if (event.bot_id || event.subtype || event.thread_ts) return;
     // Only respond in DMs (channel type "im")
@@ -39,11 +56,12 @@ function createSlackApp(expressApp) {
 
     console.log(`[slack] DM from ${event.user}: ${event.text}`);
     try {
-      const result = await runAgent("manager", event.text);
-      await say({ text: result.reply || "처리 완료" });
+      await runAgent("manager", event.text, {
+        onMessage: (agentKey, text) => postAsAgent(event.channel, agentKey, text),
+      });
     } catch (err) {
       console.error("[slack] agent error:", err);
-      await say({ text: `오류가 발생했습니다: ${err.message}` });
+      await postAsAgent(event.channel, "manager", `오류가 발생했습니다: ${err.message}`);
     }
   });
 
@@ -51,19 +69,29 @@ function createSlackApp(expressApp) {
 }
 
 async function postToSlack(channel, text) {
-  if (!app) {
-    console.warn("[slack] app not initialized, skipping postToSlack");
+  const client = agentClients.manager;
+  if (!client) {
+    console.warn("[slack] not initialized, skipping postToSlack");
     return;
   }
   try {
-    await app.client.chat.postMessage({
-      token: process.env.OPENCLAW_SLACK_TOKEN,
-      channel,
-      text,
-    });
+    await client.chat.postMessage({ channel, text });
   } catch (err) {
     console.error("[slack] postToSlack error:", err.message);
   }
 }
 
-module.exports = { createSlackApp, postToSlack };
+async function postAsAgent(channel, agentKey, text) {
+  const client = agentClients[agentKey] || agentClients.manager;
+  if (!client) {
+    console.warn("[slack] not initialized, skipping postAsAgent");
+    return;
+  }
+  try {
+    await client.chat.postMessage({ channel, text });
+  } catch (err) {
+    console.error("[slack] postAsAgent error:", err.message);
+  }
+}
+
+module.exports = { createSlackApp, postToSlack, postAsAgent };

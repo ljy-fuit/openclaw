@@ -3,6 +3,7 @@ const path = require("path");
 const Anthropic = require("@anthropic-ai/sdk");
 const { readWbs, updateTaskStatus, addTasks } = require("./wbs");
 const { readRepos, addRepos, removeRepo } = require("./repos");
+const { readMembers, addMember, updateMember, removeMember, assignToProject, unassignFromProject } = require("./members");
 
 const client = new Anthropic();
 
@@ -29,19 +30,26 @@ Schema:
   "tasks_to_add": [{ "title": "...", "description": "...", "priority": "high|medium|low", "repository": "owner/repo", "labels": [], "depends_on": [] }],
   "tasks_to_update": [{ "id": "TASK-XXX", "status": "todo|in_progress|in_review|done" }],
   "repos_to_add": [{ "name": "프로젝트명-역할", "github": "owner/repo-name", "description": "설명", "labels": ["backend|frontend|mobile|etc"] }],
-  "repos_to_remove": ["owner/repo-name"]
+  "repos_to_remove": ["owner/repo-name"],
+  "members_to_add": [{ "name": "이름", "name_en": "english_name", "slack_display": "@slack_name", "github": "github_username", "role": "backend_dev|frontend_dev|designer|mobile_dev|fullstack_dev|devops|pm|qa", "skills": [] }],
+  "members_to_remove": ["MEM-XXX 또는 이름"],
+  "project_assignments": [{ "member_name": "이름", "repository": "owner/repo", "project_name": "프로젝트명", "role_in_project": "역할" }],
+  "project_unassignments": [{ "member_name": "이름", "repository": "owner/repo" }]
 }
 `;
 
 async function callAgent(agentName, userMessage) {
   const wbs = await readWbs();
   const repos = await readRepos();
+  const members = await readMembers();
   const wbsContext = `\n\nCurrent WBS (data/wbs.json):\n${JSON.stringify(wbs, null, 2)}`;
   const reposContext = `\n\nRegistered Repositories (data/repositories.json):\n${JSON.stringify(repos, null, 2)}`;
+  const membersContext = `\n\nRegistered Members (data/members.json):\n${JSON.stringify(members, null, 2)}`;
 
   const systemPrompt =
     (SYSTEM_PROMPTS[agentName] || SYSTEM_PROMPTS.manager) +
     reposContext +
+    membersContext +
     wbsContext +
     "\n\n" +
     RESPONSE_SCHEMA;
@@ -109,6 +117,58 @@ async function applyAgentActions(result) {
     }
   }
 
+  // Apply member additions
+  if (result.members_to_add && result.members_to_add.length > 0) {
+    for (const m of result.members_to_add) {
+      const res = await addMember(m);
+      if (res.ok) {
+        logs.push(`Registered member: ${res.member.name} (${res.member.id})`);
+      } else {
+        logs.push(`Member already exists: ${res.error}`);
+      }
+    }
+  }
+
+  // Apply member removals
+  if (result.members_to_remove && result.members_to_remove.length > 0) {
+    for (const id of result.members_to_remove) {
+      const res = await removeMember(id);
+      if (res.ok) {
+        logs.push(`Removed member: ${res.removed.name}`);
+      } else {
+        logs.push(`Failed to remove member: ${res.error}`);
+      }
+    }
+  }
+
+  // Apply project assignments
+  if (result.project_assignments && result.project_assignments.length > 0) {
+    for (const a of result.project_assignments) {
+      const res = await assignToProject(a.member_name, {
+        repository: a.repository,
+        project_name: a.project_name,
+        role_in_project: a.role_in_project,
+      });
+      if (res.ok) {
+        logs.push(`Assigned ${a.member_name} to ${a.project_name || a.repository}`);
+      } else {
+        logs.push(`Failed to assign: ${res.error}`);
+      }
+    }
+  }
+
+  // Apply project unassignments
+  if (result.project_unassignments && result.project_unassignments.length > 0) {
+    for (const u of result.project_unassignments) {
+      const res = await unassignFromProject(u.member_name, u.repository);
+      if (res.ok) {
+        logs.push(`Unassigned ${u.member_name} from ${u.repository}`);
+      } else {
+        logs.push(`Failed to unassign: ${res.error}`);
+      }
+    }
+  }
+
   // Apply task updates
   if (result.tasks_to_update && result.tasks_to_update.length > 0) {
     for (const u of result.tasks_to_update) {
@@ -127,26 +187,48 @@ async function applyAgentActions(result) {
   return logs;
 }
 
-async function runAgent(agentName, userMessage, depth = 0) {
+const AGENT_NAMES = {
+  manager: "Alex",
+  pm: "Emma",
+  dev: "James",
+};
+
+async function runAgent(agentName, userMessage, options = {}) {
+  const { depth = 0, onMessage } = options;
   const MAX_DEPTH = 2;
+  const displayName = AGENT_NAMES[agentName] || agentName;
+
   const result = await callAgent(agentName, userMessage);
   const logs = await applyAgentActions(result);
 
+  // Post this agent's reply to Slack
+  if (onMessage && result.reply) {
+    await onMessage(agentName, result.reply);
+  }
+
   // Handle delegation (max 2 hops)
   if (result.delegate_to && depth < MAX_DEPTH) {
+    const targetName = AGENT_NAMES[result.delegate_to] || result.delegate_to;
     console.log(
       `[agents] ${agentName} delegating to ${result.delegate_to} (depth=${depth + 1})`
     );
+
+    // Post delegation message to Slack
+    if (onMessage) {
+      await onMessage(agentName, `→ _${targetName}에게 요청합니다..._`);
+    }
+
     const delegateResult = await runAgent(
       result.delegate_to,
       result.delegate_message || userMessage,
-      depth + 1
+      { depth: depth + 1, onMessage }
     );
-    // Merge replies
+
+    // Merge for final result (for non-Slack callers like cron/webhook)
     result.reply =
       (result.reply || "") +
       "\n\n---\n" +
-      `*[${result.delegate_to} agent]:*\n` +
+      `*[${targetName}]:*\n` +
       (delegateResult.reply || "");
     logs.push(...(delegateResult._logs || []));
   }
