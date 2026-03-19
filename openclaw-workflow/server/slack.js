@@ -23,13 +23,10 @@ function createSlackApp(expressApp) {
     console.log(`[slack] app_mention from ${event.user}: ${event.text}`);
     try {
       const result = await runAgent("manager", event.text);
-      await say({ text: result.reply || "처리 완료", thread_ts: event.ts });
+      await say({ text: result.reply || "처리 완료" });
     } catch (err) {
       console.error("[slack] agent error:", err);
-      await say({
-        text: `오류가 발생했습니다: ${err.message}`,
-        thread_ts: event.ts,
-      });
+      await say({ text: `오류가 발생했습니다: ${err.message}` });
     }
   });
 
