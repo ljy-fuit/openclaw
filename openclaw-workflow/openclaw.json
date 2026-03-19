@@ -55,6 +55,7 @@
   },
 
   "data": {
-    "wbs_file": "data/wbs.json"
+    "wbs_file": "data/wbs.json",
+    "repos_file": "data/repositories.json"
   }
 }

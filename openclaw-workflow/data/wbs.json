@@ -1,55 +1,6 @@
 {
-  "project": "farm-mvp-v2",
+  "project": "",
   "version": "0.1.0",
-  "updated_at": "2026-03-19T09:00:00+09:00",
-  "tasks": [
-    {
-      "id": "TASK-001",
-      "title": "회원가입 승인 상태 설계",
-      "description": "회원가입 시 관리자 승인이 필요한 상태 머신을 설계한다. pending → approved / rejected 흐름 정의.",
-      "status": "todo",
-      "priority": "high",
-      "assignee": null,
-      "repository": "farm-mvp-v2",
-      "labels": ["design", "auth"],
-      "branch": null,
-      "pr": null,
-      "created_at": "2026-03-19T09:00:00+09:00",
-      "started_at": null,
-      "completed_at": null,
-      "depends_on": []
-    },
-    {
-      "id": "TASK-002",
-      "title": "회원가입 API 구현",
-      "description": "POST /api/auth/register 엔드포인트 구현. 가입 후 status=pending으로 저장.",
-      "status": "todo",
-      "priority": "high",
-      "assignee": null,
-      "repository": "farm-mvp-v2",
-      "labels": ["backend", "auth", "api"],
-      "branch": null,
-      "pr": null,
-      "created_at": "2026-03-19T09:00:00+09:00",
-      "started_at": null,
-      "completed_at": null,
-      "depends_on": ["TASK-001"]
-    },
-    {
-      "id": "TASK-003",
-      "title": "관리자 승인 API 구현",
-      "description": "PATCH /api/admin/users/:id/approve 엔드포인트 구현. pending → approved 상태 변경.",
-      "status": "todo",
-      "priority": "medium",
-      "assignee": null,
-      "repository": "farm-mvp-v2",
-      "labels": ["backend", "admin", "api"],
-      "branch": null,
-      "pr": null,
-      "created_at": "2026-03-19T09:00:00+09:00",
-      "started_at": null,
-      "completed_at": null,
-      "depends_on": ["TASK-001"]
-    }
-  ]
+  "updated_at": "",
+  "tasks": []
 }

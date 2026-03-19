@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const Anthropic = require("@anthropic-ai/sdk");
 const { readWbs, updateTaskStatus, addTasks } = require("./wbs");
+const { readRepos, addRepos, removeRepo } = require("./repos");
 
 const client = new Anthropic();
 
@@ -25,17 +26,22 @@ Schema:
   "reply": "Human-readable message to post in Slack",
   "delegate_to": null | "pm" | "dev",
   "delegate_message": "Message to pass to the delegated agent (null if not delegating)",
-  "tasks_to_add": [{ "title": "...", "description": "...", "priority": "high|medium|low", "labels": [], "depends_on": [] }],
-  "tasks_to_update": [{ "id": "TASK-XXX", "status": "todo|in_progress|in_review|done" }]
+  "tasks_to_add": [{ "title": "...", "description": "...", "priority": "high|medium|low", "repository": "owner/repo", "labels": [], "depends_on": [] }],
+  "tasks_to_update": [{ "id": "TASK-XXX", "status": "todo|in_progress|in_review|done" }],
+  "repos_to_add": [{ "name": "프로젝트명-역할", "github": "owner/repo-name", "description": "설명", "labels": ["backend|frontend|mobile|etc"] }],
+  "repos_to_remove": ["owner/repo-name"]
 }
 `;
 
 async function callAgent(agentName, userMessage) {
   const wbs = await readWbs();
+  const repos = await readRepos();
   const wbsContext = `\n\nCurrent WBS (data/wbs.json):\n${JSON.stringify(wbs, null, 2)}`;
+  const reposContext = `\n\nRegistered Repositories (data/repositories.json):\n${JSON.stringify(repos, null, 2)}`;
 
   const systemPrompt =
     (SYSTEM_PROMPTS[agentName] || SYSTEM_PROMPTS.manager) +
+    reposContext +
     wbsContext +
     "\n\n" +
     RESPONSE_SCHEMA;
@@ -81,6 +87,26 @@ async function applyAgentActions(result) {
   if (result.tasks_to_add && result.tasks_to_add.length > 0) {
     const added = await addTasks(result.tasks_to_add);
     logs.push(`Added ${added.length} task(s): ${added.map((t) => t.id).join(", ")}`);
+  }
+
+  // Apply repo additions
+  if (result.repos_to_add && result.repos_to_add.length > 0) {
+    const added = await addRepos(result.repos_to_add);
+    if (added.length > 0) {
+      logs.push(`Registered ${added.length} repo(s): ${added.map((r) => r.github).join(", ")}`);
+    }
+  }
+
+  // Apply repo removals
+  if (result.repos_to_remove && result.repos_to_remove.length > 0) {
+    for (const github of result.repos_to_remove) {
+      const res = await removeRepo(github);
+      if (res.ok) {
+        logs.push(`Removed repo: ${github}`);
+      } else {
+        logs.push(`Failed to remove repo: ${res.error}`);
+      }
+    }
   }
 
   // Apply task updates

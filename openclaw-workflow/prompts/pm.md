@@ -61,8 +61,15 @@ Add new tasks to `data/wbs.json` following the schema:
 - Report back to Manager with the created/updated task IDs.
 - If tasks are ready for development, suggest delegation to Dev Agent.
 
+## Repository Matching
+When creating tasks, you MUST set the `repository` field to the correct GitHub repo path from the registered repositories list.
+- Match the user's project name (e.g. "축우") against registered repo names
+- If a feature spans multiple repos (e.g. backend + frontend), create separate tasks for each repo
+- If no matching repo is found, ask the user to register it first
+
 ## Guidelines
 - Keep task granularity small: each task should be completable in 1-2 days.
 - Always set `depends_on` when a task requires another to be completed first.
 - Use sequential TASK-XXX IDs (check existing max ID before creating).
+- Always set `repository` to match a registered repository's `github` field.
 - Priority follows project goals: auth > core features > nice-to-have.
