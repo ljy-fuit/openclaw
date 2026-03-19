@@ -1,0 +1,60 @@
+{
+  "$schema": "https://openclaw.io/schema/v1/config.json",
+  "workspace": "C:/Users/fuit/openclaw/openclaw-workflow",
+
+  "agents": {
+    "manager": {
+      "prompt_file": "prompts/manager.md",
+      "role": "router",
+      "description": "Classifies incoming requests and delegates to PM or Dev agent",
+      "can_delegate_to": ["pm", "dev"]
+    },
+    "pm": {
+      "prompt_file": "prompts/pm.md",
+      "role": "planner",
+      "description": "Transforms ideas into specs and WBS tasks",
+      "can_delegate_to": []
+    },
+    "dev": {
+      "prompt_file": "prompts/dev.md",
+      "role": "executor",
+      "description": "Produces technical specs and processes GitHub events for WBS updates",
+      "can_delegate_to": []
+    }
+  },
+
+  "channels": {
+    "slack": {
+      "type": "slack",
+      "token_env": "OPENCLAW_SLACK_TOKEN",
+      "default_channel": "C0AMF4G23PF",
+      "events": ["message", "app_mention"]
+    }
+  },
+
+  "hooks": {
+    "github": {
+      "type": "webhook",
+      "path": "/hooks/github",
+      "secret_env": "OPENCLAW_GITHUB_SECRET",
+      "events": ["push", "pull_request"],
+      "forward_to": "dev"
+    }
+  },
+
+  "cron": {
+    "daily_brief": {
+      "schedule": "0 9 * * *",
+      "timezone": "Asia/Seoul",
+      "agent": "manager",
+      "session": "isolated",
+      "message": "Read data/wbs.json and post today's work summary to Slack. Include: tasks by status, blockers, and priorities for today.",
+      "announce": true,
+      "channel": "slack"
+    }
+  },
+
+  "data": {
+    "wbs_file": "data/wbs.json"
+  }
+}

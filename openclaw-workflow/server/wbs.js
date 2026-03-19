@@ -1,0 +1,103 @@
+const fs = require("fs");
+const path = require("path");
+const lockfile = require("proper-lockfile");
+
+const WBS_PATH = path.resolve(__dirname, "..", "data", "wbs.json");
+
+const VALID_TRANSITIONS = {
+  todo: ["in_progress"],
+  in_progress: ["in_review"],
+  in_review: ["done", "in_progress"],
+  done: [],
+};
+
+async function readWbs() {
+  const raw = await fs.promises.readFile(WBS_PATH, "utf-8");
+  return JSON.parse(raw);
+}
+
+async function writeWbs(wbs) {
+  wbs.updated_at = new Date().toISOString();
+  let release;
+  try {
+    release = await lockfile.lock(WBS_PATH, { retries: 3 });
+    await fs.promises.writeFile(WBS_PATH, JSON.stringify(wbs, null, 2), "utf-8");
+  } finally {
+    if (release) await release();
+  }
+}
+
+function getNextTaskId(wbs) {
+  let max = 0;
+  for (const t of wbs.tasks) {
+    const num = parseInt(t.id.replace("TASK-", ""), 10);
+    if (num > max) max = num;
+  }
+  return `TASK-${String(max + 1).padStart(3, "0")}`;
+}
+
+function validateTransition(from, to) {
+  const allowed = VALID_TRANSITIONS[from];
+  if (!allowed) return false;
+  return allowed.includes(to);
+}
+
+async function updateTaskStatus(taskId, newStatus, extra = {}) {
+  const wbs = await readWbs();
+  const task = wbs.tasks.find((t) => t.id === taskId);
+  if (!task) return { ok: false, error: `Task ${taskId} not found` };
+
+  if (!validateTransition(task.status, newStatus)) {
+    return {
+      ok: false,
+      error: `Invalid transition: ${task.status} → ${newStatus}`,
+    };
+  }
+
+  task.status = newStatus;
+
+  if (newStatus === "in_progress" && !task.started_at) {
+    task.started_at = new Date().toISOString();
+  }
+  if (newStatus === "done") {
+    task.completed_at = new Date().toISOString();
+  }
+
+  // Apply extra fields (branch, pr, etc.)
+  Object.assign(task, extra);
+
+  await writeWbs(wbs);
+  return { ok: true, task };
+}
+
+async function addTasks(newTasks) {
+  const wbs = await readWbs();
+  const added = [];
+
+  for (const t of newTasks) {
+    const id = t.id || getNextTaskId(wbs);
+    const task = {
+      id,
+      title: t.title,
+      description: t.description || "",
+      status: "todo",
+      priority: t.priority || "medium",
+      assignee: t.assignee || null,
+      repository: t.repository || wbs.project,
+      labels: t.labels || [],
+      branch: null,
+      pr: null,
+      created_at: new Date().toISOString(),
+      started_at: null,
+      completed_at: null,
+      depends_on: t.depends_on || [],
+    };
+    wbs.tasks.push(task);
+    added.push(task);
+  }
+
+  await writeWbs(wbs);
+  return added;
+}
+
+module.exports = { readWbs, writeWbs, getNextTaskId, updateTaskStatus, addTasks };
