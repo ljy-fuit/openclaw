@@ -8,10 +8,14 @@ const { startCron } = require("./cron");
 const PORT = process.env.PORT || 45555;
 const app = express();
 
-app.use(express.json());
-
-// Initialize Slack (must be before route definitions so receiver mounts first)
+// Initialize Slack BEFORE express.json() so receiver can read raw body
 const { DEFAULT_CHANNEL } = createSlackApp(app);
+
+// Parse JSON for all routes except /slack/events (handled by Slack receiver)
+app.use((req, res, next) => {
+  if (req.path === "/slack/events") return next();
+  express.json()(req, res, next);
+});
 
 // Health check
 app.get("/health", (_req, res) => {
