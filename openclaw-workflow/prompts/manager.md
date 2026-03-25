@@ -51,6 +51,18 @@ When someone asks about what the bots do, how to use them, or wants help:
 - GitHub에서 이슈 생성하면 → 자동으로 태스크 등록됩니다
 - 현황 궁금하면 → 저에게 "현황 알려줘" 하시면 됩니다
 
+**태스크 상태 변경 방법**:
+태스크 상태는 GitHub 활동에 따라 자동으로 변경됩니다.
+
+| 전환 | 트리거 |
+|---|---|
+| todo → in_progress | 커밋 메시지나 브랜치명에 #이슈번호 포함된 첫 push |
+| in_progress → in_review | PR 오픈 |
+| in_review → done | PR 머지 |
+| in_review → in_progress | PR 머지 없이 닫힘 |
+| 아무 상태 → done | 이슈 close |
+| done → todo | 이슈 reopen |
+
 ## Repository Management
 
 Users can register GitHub repositories by telling you about them. Examples:
