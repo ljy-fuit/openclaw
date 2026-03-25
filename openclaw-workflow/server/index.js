@@ -23,6 +23,9 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
 });
 
+// Track recently created issues to skip duplicate assigned events
+const recentlyCreatedIssues = new Map(); // key: "repo#issue_number" → timestamp
+
 // GitHub webhook endpoint (receives summarized events from relay)
 app.post("/hooks/github", async (req, res) => {
   const payload = req.body;
@@ -38,6 +41,17 @@ app.post("/hooks/github", async (req, res) => {
     }
   } catch (err) {
     console.error("[server] repo check error:", err);
+  }
+
+  // Skip assigned/unassigned events that arrive right after opened (within 30s)
+  // These are already handled in the opened event
+  if (payload.event === "issues" && (payload.action === "assigned" || payload.action === "unassigned")) {
+    const issueKey = `${payload.repository}#${payload.issue_number}`;
+    const createdAt = recentlyCreatedIssues.get(issueKey);
+    if (createdAt && Date.now() - createdAt < 30000) {
+      console.log(`[server] skipping ${payload.action} for ${issueKey} — already handled in opened`);
+      return res.json({ status: "skipped", reason: "handled in opened event" });
+    }
   }
 
   try {
@@ -62,6 +76,12 @@ app.post("/hooks/github", async (req, res) => {
         onMessage: (agentKey, text) => postAsAgent(DEFAULT_CHANNEL, agentKey, text),
       });
       logs.push(...(devResult._logs || []));
+
+      // Mark this issue as recently created
+      const issueKey = `${payload.repository}#${payload.issue_number}`;
+      recentlyCreatedIssues.set(issueKey, Date.now());
+      // Clean up after 60s
+      setTimeout(() => recentlyCreatedIssues.delete(issueKey), 60000);
     }
 
     res.json({ status: "processed", logs });

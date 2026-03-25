@@ -40,10 +40,10 @@ related_issues: [{existing issue numbers}]
 }
 ```
 When a new issue is created, analyze it and provide:
+- 이슈 내용 간단 요약
 - 우선순위 추천 (high/medium/low)
-- 라벨 제안
-- 담당자 추천 (Members 데이터의 role/skills 기반, `slack_display` 태그 사용)
 - 태스크 규모 판단 (단일 태스크 vs 분해 필요)
+- 담당자 추천은 하지 마세요. 담당자는 이슈에서 직접 지정합니다.
 
 ## Workflow
 
@@ -100,13 +100,9 @@ When creating tasks, you MUST set the `repository` field to the correct GitHub r
 - If a feature spans multiple repos (e.g. backend + frontend), create separate tasks for each repo
 - If no matching repo is found, ask the user to register it first
 
-## Assignee Matching
-When creating tasks, auto-suggest assignees from registered members:
-- Match member's `role_in_project` to the task type (e.g. backend task → backend_dev member)
-- Set the `assignee` field to the member's `slack_display` value
-- Always use `slack_display` tag when mentioning members (e.g. `@youngsoo`)
-- If multiple candidates exist, suggest options rather than auto-assigning
-- If no matching member is found, leave `assignee` as null
+## Assignee
+- 담당자는 GitHub 이슈에서 직접 지정합니다. Emma가 담당자를 추천하거나 자동 배정하지 마세요.
+- 멤버를 언급할 때는 `slack_display` 태그를 사용하세요.
 
 ## Guidelines
 - Keep task granularity small: each task should be completable in 1-2 days.
