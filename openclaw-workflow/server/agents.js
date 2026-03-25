@@ -27,8 +27,8 @@ Schema:
   "reply": "Human-readable message to post in Slack",
   "delegate_to": null | "pm" | "dev",
   "delegate_message": "Message to pass to the delegated agent (null if not delegating)",
-  "tasks_to_add": [{ "title": "...", "description": "...", "priority": "high|medium|low", "repository": "owner/repo", "labels": [], "depends_on": [] }],
-  "tasks_to_update": [{ "id": "TASK-XXX", "status": "todo|in_progress|in_review|done" }],
+  "tasks_to_add": [{ "title": "...", "description": "...", "priority": "high|medium|low", "repository": "owner/repo", "issue_number": 42, "issue_url": "https://github.com/...", "labels": [], "depends_on": [], "assignee": "member name or null" }],
+  "tasks_to_update": [{ "id": "owner/repo#42", "status": "todo|in_progress|in_review|done", "assignee": "member name or null", "branch": "branch-name", "pr": 123 }],
   "repos_to_add": [{ "name": "프로젝트명-역할", "github": "owner/repo-name", "description": "설명", "labels": ["backend|frontend|mobile|etc"] }],
   "repos_to_remove": ["owner/repo-name"],
   "members_to_add": [{ "name": "이름", "name_en": "english_name", "slack_display": "@slack_name", "github": "github_username", "role": "backend_dev|frontend_dev|designer|mobile_dev|fullstack_dev|devops|pm|qa", "skills": [] }],
@@ -175,6 +175,7 @@ async function applyAgentActions(result) {
       const extra = {};
       if (u.branch) extra.branch = u.branch;
       if (u.pr) extra.pr = u.pr;
+      if (u.assignee !== undefined) extra.assignee = u.assignee;
       const res = await updateTaskStatus(u.id, u.status, extra);
       if (res.ok) {
         logs.push(`Updated ${u.id} → ${u.status}`);

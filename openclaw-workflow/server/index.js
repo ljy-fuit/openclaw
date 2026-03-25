@@ -2,7 +2,8 @@ require("dotenv").config({ path: require("path").resolve(__dirname, "..", ".env"
 
 const express = require("express");
 const { runAgent } = require("./agents");
-const { createSlackApp, postToSlack } = require("./slack");
+const { createSlackApp, postToSlack, postAsAgent } = require("./slack");
+const { readRepos } = require("./repos");
 const { startCron } = require("./cron");
 
 const PORT = process.env.PORT || 45555;
@@ -27,18 +28,41 @@ app.post("/hooks/github", async (req, res) => {
   const payload = req.body;
   console.log(`[server] received github hook: ${payload.event} — ${payload.summary}`);
 
+  // Skip unregistered repositories — no API call, no Slack message
+  try {
+    const repos = await readRepos();
+    const registered = repos.repositories.some((r) => r.github === payload.repository);
+    if (!registered) {
+      console.log(`[server] ignoring unregistered repo: ${payload.repository}`);
+      return res.json({ status: "ignored", reason: "unregistered repository" });
+    }
+  } catch (err) {
+    console.error("[server] repo check error:", err);
+  }
+
   try {
     const userMessage = JSON.stringify(payload);
-    const result = await runAgent("dev", userMessage);
+
+    // Route to appropriate agent based on event type
+    // Issue opened → Emma (PM) analyzes, then James (Dev) creates task
+    // All other events → James (Dev) handles directly
+    let agentName = "dev";
+    if (payload.event === "issues" && payload.action === "opened") {
+      agentName = "pm";
+    }
+
+    const result = await runAgent(agentName, userMessage, {
+      onMessage: (agentKey, text) => postAsAgent(DEFAULT_CHANNEL, agentKey, text),
+    });
     const logs = result._logs || [];
 
-    // Notify Slack
-    const slackMessage =
-      `*[GitHub ${payload.event}]* ${payload.summary}\n` +
-      (result.reply || "") +
-      (logs.length ? `\n_${logs.join(", ")}_` : "");
-
-    await postToSlack(DEFAULT_CHANNEL, slackMessage);
+    // For new issues, also run dev agent to create the task
+    if (payload.event === "issues" && payload.action === "opened") {
+      const devResult = await runAgent("dev", userMessage, {
+        onMessage: (agentKey, text) => postAsAgent(DEFAULT_CHANNEL, agentKey, text),
+      });
+      logs.push(...(devResult._logs || []));
+    }
 
     res.json({ status: "processed", logs });
   } catch (err) {

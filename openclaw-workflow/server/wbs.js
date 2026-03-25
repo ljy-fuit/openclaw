@@ -8,7 +8,7 @@ const VALID_TRANSITIONS = {
   todo: ["in_progress"],
   in_progress: ["in_review"],
   in_review: ["done", "in_progress"],
-  done: [],
+  done: ["todo"],
 };
 
 async function readWbs() {
@@ -27,13 +27,14 @@ async function writeWbs(wbs) {
   }
 }
 
-function getNextTaskId(wbs) {
-  let max = 0;
-  for (const t of wbs.tasks) {
-    const num = parseInt(t.id.replace("TASK-", ""), 10);
-    if (num > max) max = num;
-  }
-  return `TASK-${String(max + 1).padStart(3, "0")}`;
+function makeTaskId(issueNumber, repo) {
+  return `${repo}#${issueNumber}`;
+}
+
+function findTaskByIssue(wbs, issueNumber, repo) {
+  return wbs.tasks.find(
+    (t) => t.issue_number === issueNumber && t.repository === repo
+  );
 }
 
 function validateTransition(from, to) {
@@ -62,8 +63,11 @@ async function updateTaskStatus(taskId, newStatus, extra = {}) {
   if (newStatus === "done") {
     task.completed_at = new Date().toISOString();
   }
+  if (newStatus === "todo") {
+    task.completed_at = null;
+  }
 
-  // Apply extra fields (branch, pr, etc.)
+  // Apply extra fields (branch, pr, assignee, etc.)
   Object.assign(task, extra);
 
   await writeWbs(wbs);
@@ -75,9 +79,25 @@ async function addTasks(newTasks) {
   const added = [];
 
   for (const t of newTasks) {
-    const id = t.id || getNextTaskId(wbs);
+    // Deduplicate by issue_number + repository
+    if (t.issue_number && t.repository) {
+      const existing = findTaskByIssue(wbs, t.issue_number, t.repository);
+      if (existing) {
+        // Update existing task instead of creating duplicate
+        if (t.assignee !== undefined) existing.assignee = t.assignee;
+        if (t.labels) existing.labels = t.labels;
+        added.push(existing);
+        continue;
+      }
+    }
+
+    const id = t.id || (t.issue_number && t.repository
+      ? makeTaskId(t.issue_number, t.repository)
+      : `task-${Date.now()}`);
+
     const task = {
       id,
+      issue_number: t.issue_number || null,
       title: t.title,
       description: t.description || "",
       status: "todo",
@@ -87,6 +107,7 @@ async function addTasks(newTasks) {
       labels: t.labels || [],
       branch: null,
       pr: null,
+      issue_url: t.issue_url || null,
       created_at: new Date().toISOString(),
       started_at: null,
       completed_at: null,
@@ -100,4 +121,4 @@ async function addTasks(newTasks) {
   return added;
 }
 
-module.exports = { readWbs, writeWbs, getNextTaskId, updateTaskStatus, addTasks };
+module.exports = { readWbs, writeWbs, makeTaskId, findTaskByIssue, updateTaskStatus, addTasks };

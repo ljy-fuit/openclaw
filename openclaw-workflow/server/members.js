@@ -40,6 +40,14 @@ function findMemberByName(data, name) {
   );
 }
 
+function findMemberByGithub(data, githubUsername) {
+  if (!githubUsername) return null;
+  const q = githubUsername.toLowerCase();
+  return data.members.find(
+    (m) => m.github && m.github.toLowerCase() === q
+  );
+}
+
 async function addMember(memberInfo) {
   const data = await readMembers();
 
@@ -132,6 +140,7 @@ module.exports = {
   writeMembers,
   getNextMemberId,
   findMemberByName,
+  findMemberByGithub,
   addMember,
   updateMember,
   removeMember,

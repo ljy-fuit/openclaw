@@ -11,7 +11,7 @@ function startCron(defaultChannel) {
       try {
         const result = await runAgent(
           "manager",
-          "오늘의 데일리 브리핑을 작성해줘. 포함할 내용: 각 멤버별 오늘 할 일(프로젝트별로 그룹핑), 전체 태스크 현황, 블로커, 미배정 태스크."
+          "오늘의 데일리 브리핑을 작성해줘. 멤버별로 진행 중인 태스크를 slack_display 태그로 정리하고, 미배정 태스크와 전체 현황도 포함해줘."
         );
         await postToSlack(defaultChannel, result.reply || "데일리 브리핑을 생성할 수 없습니다.");
         console.log("[cron] daily briefing posted");
@@ -36,7 +36,7 @@ function startCron(defaultChannel) {
       try {
         const result = await runAgent(
           "manager",
-          "이번 주 주간 브리핑을 작성해줘. 포함할 내용: 지난주 완료된 태스크, 이번 주 각 멤버별/프로젝트별 할 일, 블로커나 지연된 태스크."
+          "이번 주 주간보고를 작성해줘. 지난주 완료 태스크, 이번 주 멤버별 진행 예정 태스크, 블로커를 slack_display 태그로 정리해줘."
         );
         await postToSlack(defaultChannel, result.reply || "주간 브리핑을 생성할 수 없습니다.");
         console.log("[cron] weekly briefing posted");
