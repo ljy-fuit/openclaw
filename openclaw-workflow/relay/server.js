@@ -124,9 +124,16 @@ app.post("/github", async (req, res) => {
     case "pull_request":
       summary = summarizePullRequest(req.body);
       break;
-    case "issues":
+    case "issues": {
+      const VALID_ACTIONS = ["opened", "assigned", "unassigned", "closed", "reopened"];
+      const action = req.body.action;
+      if (!VALID_ACTIONS.includes(action)) {
+        console.log(`[relay] ignoring issues action: ${action}`);
+        return res.json({ status: "ignored", event, action });
+      }
       summary = summarizeIssues(req.body);
       break;
+    }
     default:
       console.log(`[relay] ignoring event: ${event}`);
       return res.json({ status: "ignored", event });
