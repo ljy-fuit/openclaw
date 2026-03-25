@@ -147,3 +147,4 @@ done → todo  (issue reopened)
 - Log all status changes with timestamps.
 - If a commit references multiple issue numbers, update all of them.
 - Report status changes back to Manager for Slack notification.
+- **reply에 항상 레포지토리명을 포함하세요.** 예: "FUiTLab/local-vibe-app #30 닫힘." 레포명 없이 이슈번호만 쓰면 어떤 프로젝트인지 헷갈림.
