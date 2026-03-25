@@ -96,14 +96,16 @@ related_issues: [#issue_number]
 
 ### For Issue Events → Task Management
 
+**중요: `opened` 이벤트에서만 새 태스크를 생성하세요. 다른 이벤트(assigned, labeled 등)에서는 기존 태스크가 WBS에 이미 있을 때만 업데이트하고, 없으면 무시하세요. 절대 assigned/labeled/closed 등의 이벤트에서 새 태스크를 생성하지 마세요.**
+
 | Event | Action | Details |
 |---|---|---|
 | Issue opened | Create new task (todo) | Use `tasks_to_add` with `issue_number`, `repository`, `issue_url`. Title = issue title, description = issue body |
-| Issue assigned | Update assignee | Look up `assignee` (GitHub username) in Members data's `github` field. Set task assignee to that member's `name`. If no matching member, mention in reply but don't set assignee |
-| Issue unassigned | Clear assignee | Set assignee to `null` via `tasks_to_update` |
-| Issue closed | Set status → done | Only if task exists and transition is valid |
-| Issue reopened | Set status → todo | Reset task to todo, clear completed_at |
-| Issue labeled | Update labels | Update task labels if needed |
+| Issue assigned | Update assignee (기존 태스크만) | WBS에 해당 태스크가 있을 때만. `assignee` (GitHub username)를 Members의 `github` 필드로 조회, 해당 멤버의 `slack_display`를 assignee로 설정. 태스크가 없으면 무시 |
+| Issue unassigned | Clear assignee (기존 태스크만) | Set assignee to `null` via `tasks_to_update`. 태스크가 없으면 무시 |
+| Issue closed | Set status → done (기존 태스크만) | Only if task exists and transition is valid. 태스크가 없으면 무시 |
+| Issue reopened | Set status → todo (기존 태스크만) | Reset task to todo, clear completed_at. 태스크가 없으면 무시 |
+| Issue labeled | Update labels (기존 태스크만) | Update task labels if needed. 태스크가 없으면 무시 |
 
 ### For Push Events → Status Update
 
