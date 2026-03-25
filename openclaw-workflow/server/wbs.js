@@ -5,8 +5,8 @@ const lockfile = require("proper-lockfile");
 const WBS_PATH = path.resolve(__dirname, "..", "data", "wbs.json");
 
 const VALID_TRANSITIONS = {
-  todo: ["in_progress"],
-  in_progress: ["in_review"],
+  todo: ["in_progress", "done"],
+  in_progress: ["in_review", "done"],
   in_review: ["done", "in_progress"],
   done: ["todo"],
 };
