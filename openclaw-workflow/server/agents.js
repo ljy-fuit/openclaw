@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const Anthropic = require("@anthropic-ai/sdk");
-const { readWbs, updateTaskStatus, addTasks } = require("./wbs");
+const { readWbs, updateTaskStatus, updateTaskFields, addTasks } = require("./wbs");
 const { readRepos, addRepos, removeRepo } = require("./repos");
 const { readMembers, addMember, updateMember, removeMember, assignToProject, unassignFromProject } = require("./members");
 
@@ -176,11 +176,22 @@ async function applyAgentActions(result) {
       if (u.branch) extra.branch = u.branch;
       if (u.pr) extra.pr = u.pr;
       if (u.assignee !== undefined) extra.assignee = u.assignee;
-      const res = await updateTaskStatus(u.id, u.status, extra);
-      if (res.ok) {
-        logs.push(`Updated ${u.id} → ${u.status}`);
+
+      // If no status change, just update fields (e.g. assignee only)
+      if (!u.status) {
+        const res = await updateTaskFields(u.id, extra);
+        if (res.ok) {
+          logs.push(`Updated ${u.id} fields`);
+        } else {
+          logs.push(`Failed to update ${u.id}: ${res.error}`);
+        }
       } else {
-        logs.push(`Failed to update ${u.id}: ${res.error}`);
+        const res = await updateTaskStatus(u.id, u.status, extra);
+        if (res.ok) {
+          logs.push(`Updated ${u.id} → ${u.status}`);
+        } else {
+          logs.push(`Failed to update ${u.id}: ${res.error}`);
+        }
       }
     }
   }

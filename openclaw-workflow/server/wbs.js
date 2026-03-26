@@ -74,6 +74,17 @@ async function updateTaskStatus(taskId, newStatus, extra = {}) {
   return { ok: true, task };
 }
 
+async function updateTaskFields(taskId, fields) {
+  const wbs = await readWbs();
+  const task = wbs.tasks.find((t) => t.id === taskId);
+  if (!task) return { ok: false, error: `Task ${taskId} not found` };
+
+  Object.assign(task, fields);
+
+  await writeWbs(wbs);
+  return { ok: true, task };
+}
+
 async function addTasks(newTasks) {
   const wbs = await readWbs();
   const added = [];
@@ -121,4 +132,4 @@ async function addTasks(newTasks) {
   return added;
 }
 
-module.exports = { readWbs, writeWbs, makeTaskId, findTaskByIssue, updateTaskStatus, addTasks };
+module.exports = { readWbs, writeWbs, makeTaskId, findTaskByIssue, updateTaskStatus, updateTaskFields, addTasks };
