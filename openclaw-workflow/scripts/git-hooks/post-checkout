@@ -1,0 +1,35 @@
+#!/bin/bash
+# OpenClaw: 브랜치 생성 시 자동으로 태스크를 in_progress로 변경
+# 이 파일을 각 프로젝트 레포의 scripts/git-hooks/post-checkout에 복사하세요.
+
+PREV_HEAD=$1
+NEW_HEAD=$2
+BRANCH_FLAG=$3
+
+# 브랜치 전환이 아니면 무시 (file checkout 등)
+[ "$BRANCH_FLAG" != "1" ] && exit 0
+
+# 같은 HEAD면 새 브랜치 생성
+[ "$PREV_HEAD" = "$NEW_HEAD" ] || exit 0
+
+OPENCLAW_URL="${OPENCLAW_URL:-http://localhost:45555}"
+BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+# 브랜치명에서 이슈번호 추출 (feat/37/desc, fix/37-desc, 37-desc 등)
+ISSUE=$(echo "$BRANCH" | grep -oE '(^|/)([0-9]+)(-|/|$)' | grep -oE '[0-9]+' | head -1)
+
+[ -z "$ISSUE" ] && exit 0
+
+# 레포명 추출 (owner/repo)
+REMOTE_URL=$(git remote get-url origin 2>/dev/null)
+REPO=$(echo "$REMOTE_URL" | sed -E 's#.*(github\.com[:/])##' | sed 's/\.git$//')
+
+[ -z "$REPO" ] && exit 0
+
+# OpenClaw 서버에 상태 변경 요청 (백그라운드로 실행)
+curl -s -X POST "${OPENCLAW_URL}/hooks/task-status" \
+  -H "Content-Type: application/json" \
+  -d "{\"issue_number\": ${ISSUE}, \"repository\": \"${REPO}\", \"status\": \"in_progress\", \"branch\": \"${BRANCH}\"}" \
+  > /dev/null 2>&1 &
+
+exit 0

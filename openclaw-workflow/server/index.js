@@ -4,6 +4,7 @@ const express = require("express");
 const { runAgent } = require("./agents");
 const { createSlackApp, postToSlack, postAsAgent } = require("./slack");
 const { readRepos } = require("./repos");
+const { updateTaskStatus, makeTaskId } = require("./wbs");
 const { startCron } = require("./cron");
 
 const PORT = process.env.PORT || 45555;
@@ -87,6 +88,35 @@ app.post("/hooks/github", async (req, res) => {
     res.json({ status: "processed", logs });
   } catch (err) {
     console.error("[server] github hook error:", err);
+    res.status(500).json({ status: "error", error: err.message });
+  }
+});
+
+// Direct task status update endpoint (called from git hooks)
+app.post("/hooks/task-status", async (req, res) => {
+  const { issue_number, repository, status, branch } = req.body;
+  console.log(`[server] task-status: ${repository}#${issue_number} → ${status}`);
+
+  if (!issue_number || !repository || !status) {
+    return res.status(400).json({ status: "error", error: "issue_number, repository, status required" });
+  }
+
+  try {
+    const taskId = makeTaskId(issue_number, repository);
+    const extra = {};
+    if (branch) extra.branch = branch;
+
+    const result = await updateTaskStatus(taskId, status, extra);
+    if (result.ok) {
+      // Notify Slack
+      await postAsAgent(DEFAULT_CHANNEL, "dev", `${repository} #${issue_number} → ${status} (branch: ${branch || "N/A"})`);
+      res.json({ status: "updated", task: result.task });
+    } else {
+      console.log(`[server] task-status skip: ${result.error}`);
+      res.json({ status: "skipped", reason: result.error });
+    }
+  } catch (err) {
+    console.error("[server] task-status error:", err);
     res.status(500).json({ status: "error", error: err.message });
   }
 });
