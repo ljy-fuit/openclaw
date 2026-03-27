@@ -70,8 +70,12 @@ async function callAgent(agentName, userMessage) {
     proc.stderr.on("data", (d) => { stderr += d; });
     proc.on("error", reject);
     proc.on("close", (code) => {
-      if (code !== 0) reject(new Error(`claude CLI exit ${code}: ${stderr}`));
-      else resolve(stdout.trim());
+      if (code !== 0) {
+        console.error(`[agents] claude CLI exit ${code}\nstdout: ${stdout}\nstderr: ${stderr}`);
+        reject(new Error(`claude CLI exit ${code}: ${stderr || stdout}`));
+      } else {
+        resolve(stdout.trim());
+      }
     });
 
     // Pass system prompt + user message via stdin
