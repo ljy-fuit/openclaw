@@ -1,11 +1,9 @@
 const fs = require("fs");
 const path = require("path");
-const Anthropic = require("@anthropic-ai/sdk");
+const { spawn } = require("child_process");
 const { readWbs, updateTaskStatus, updateTaskFields, addTasks } = require("./wbs");
 const { readRepos, addRepos, removeRepo } = require("./repos");
 const { readMembers, addMember, updateMember, removeMember, assignToProject, unassignFromProject } = require("./members");
-
-const client = new Anthropic();
 
 const PROMPTS_DIR = path.resolve(__dirname, "..", "prompts");
 
@@ -54,19 +52,34 @@ async function callAgent(agentName, userMessage) {
     "\n\n" +
     RESPONSE_SCHEMA;
 
-  console.log(`[agents] calling ${agentName} agent...`);
+  console.log(`[agents] calling ${agentName} agent via CLI...`);
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 2048,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userMessage }],
+  const text = await new Promise((resolve, reject) => {
+    const proc = spawn("claude", [
+      "-p",
+      "--output-format", "text",
+      "--model", "sonnet",
+    ], {
+      env: { ...process.env },
+      timeout: 120000,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    proc.stdout.on("data", (d) => { stdout += d; });
+    proc.stderr.on("data", (d) => { stderr += d; });
+    proc.on("error", reject);
+    proc.on("close", (code) => {
+      if (code !== 0) reject(new Error(`claude CLI exit ${code}: ${stderr}`));
+      else resolve(stdout.trim());
+    });
+
+    // Pass system prompt + user message via stdin
+    proc.stdin.write(systemPrompt);
+    proc.stdin.write("\n\n---\n\nUser message:\n");
+    proc.stdin.write(userMessage);
+    proc.stdin.end();
   });
-
-  const text = response.content
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("");
 
   let parsed;
   try {
