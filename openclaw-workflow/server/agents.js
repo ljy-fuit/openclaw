@@ -60,7 +60,7 @@ async function callAgent(agentName, userMessage) {
       "--output-format", "text",
       "--model", "sonnet",
     ], {
-      env: { ...process.env },
+      env: { ...process.env, ANTHROPIC_API_KEY: undefined },
       timeout: 120000,
     });
 
