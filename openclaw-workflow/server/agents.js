@@ -55,7 +55,7 @@ async function callAgent(agentName, userMessage) {
   console.log(`[agents] calling ${agentName} agent via CLI...`);
 
   const text = await new Promise((resolve, reject) => {
-    const proc = spawn("claude", [
+    const proc = spawn("/root/.nvm/versions/node/v18.20.5/bin/claude", [
       "-p",
       "--output-format", "text",
       "--model", "sonnet",
